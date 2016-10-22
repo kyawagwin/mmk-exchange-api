@@ -23,8 +23,8 @@ app.use(morgan('combined', {
 
 mongoose.connect(config.database);
 
-var port = process.env.PORT;
-var host = process.env.IP;
+var port = process.env.PORT || 3000;
+var host = process.env.IP || 'localhost';
 
 var apiRoutes = express.Router();
 
@@ -36,9 +36,9 @@ apiRoutes.get('/latest', function(req, res) {
     var currentTimeInMs = Date.now();
     var oneHourTimestamp = 3600;
     var timeInMs = (currentTimeInMs / 1000) - oneHourTimestamp;
-    
+
     // console.log(timeInMs);
-    
+
     Rate.findOne().where('rateTimestamp').gt(timeInMs).limit(1).sort({'rateTimestamp': -1}).select().exec(function(err, rate) {
         if(err) {
             res.status(501).send(err);
@@ -50,7 +50,7 @@ apiRoutes.get('/latest', function(req, res) {
                     res.status(501).send(err);
                     return;
                 }
-                
+
                 res.status(200).json(rateJson);
                 return;
             });
@@ -65,59 +65,59 @@ apiRoutes.get('/latest', function(req, res) {
 app.use('/api', apiRoutes);
 
 app.get('/', function(req, res) {
-    res.status(200).send('Server response OK!'); 
+    res.status(200).send('Server response OK!');
 });
 
 app.get('/setup', function(req, res) {
     var rate = new Rate();
-    
+
     for (var property in data.rates) {
         if (typeof rate.get(property) != 'undefined') {
-            rate.set(property, data.rates[property])
+            rate.set(property, data.rates[property]);
         }
     }
     rate.rateTimestamp = data.timestamp;
     rate.baseCurrency = data.base;
-    
+
     rate.save(function(err) {
         if(err) {
             console.log(err);
         }
     });
-    
+
     res.status(200).json({success: true});
 });
 
 function saveLatestRate(callback) {
-    var url = 'https://openexchangerates.org/api/latest.json?app_id=' + config.apiKey;
+    var url = 'https://openexchangerates.org/api/latest.json?base=mmk&app_id=' + config.apiKey;
     request(url, function (err, response, data) {
         if (!err && response.statusCode == 200) {
             var rateJson = JSON.parse(data);
             var rate = new Rate();
-    
+
             for (var property in rateJson.rates) {
                 if (typeof rate.get(property) != 'undefined') {
-                    rate.set(property, rateJson.rates[property]);
+                    rate.set(property, 1 / rateJson.rates[property]);
                 }
             }
             rate.rateTimestamp = rateJson.timestamp;
             rate.baseCurrency = rateJson.base;
-            
+
             rate.save(function(err) {
                 if(err) {
                     return callback(err, null);
                 }
-                
+
                 Rate.findById(rate._id, function (err, rate) {
                     if(err) {
                         return callback(err, null);
                     }
-                    
+
                     return callback(null, rate);
                 } );
             });
         }
-        
+
         if(err) {
             return callback(err, null);
         }
