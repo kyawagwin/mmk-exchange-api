@@ -21,6 +21,8 @@ app.use(morgan('combined', {
   skip: function (req, res) { return res.statusCode < 400 }
 }));
 
+var port = process.env.PORT || 8080;
+
 mongoose.connect(config.database);
 
 var apiRoutes = express.Router();
@@ -121,6 +123,6 @@ function saveLatestRate(callback) {
     });
 }
 
-app.listen(process.env.PORT, process.env.IP, function() {
+app.listen(port, function() {
   console.log('Magic happens at port: ' + port);
 });
