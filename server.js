@@ -23,9 +23,6 @@ app.use(morgan('combined', {
 
 mongoose.connect(config.database);
 
-var port = process.env.PORT || 3000;
-var host = process.env.IP || 'localhost';
-
 var apiRoutes = express.Router();
 
 apiRoutes.get('/', function(req, res) {
@@ -124,6 +121,6 @@ function saveLatestRate(callback) {
     });
 }
 
-app.listen(port, host);
-
-console.log('Magic happens at port: ' + port);
+app.listen(process.env.PORT, process.env.IP, function() {
+  console.log('Magic happens at port: ' + port);
+});
