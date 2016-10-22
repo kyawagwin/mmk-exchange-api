@@ -1,0 +1,23 @@
+{
+  "name": "mmk-exchange",
+  "version": "1.0.0",
+  "description": "Exchange rate API for Myanmar currency",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Kyaw Aung Win",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.15.2",
+    "express": "^4.14.0",
+    "jsonwebtoken": "^7.1.9",
+    "mongoose": "^4.6.4",
+    "morgan": "^1.7.0",
+    "request": "^2.75.0"
+  },
+  "devDependencies": {
+    "nodemon": "^1.11.0"
+  }
+}
