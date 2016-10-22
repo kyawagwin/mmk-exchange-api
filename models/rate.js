@@ -22,6 +22,9 @@ module.exports = mongoose.model('Rate', new Schema({
     BRL: {type: Number, default: 0},
     ZAR: {type: Number, default: 0},
     MMK: {type: Number, default: 0},
+    MYR: {type: Number, default: 0},
+    TWD: {type: Number, default: 0},
+    THB: {type: Number, default: 0},
     rateTimestamp: {type: Number, default: 0},
     baseCurrency: {type: String}
 }));
