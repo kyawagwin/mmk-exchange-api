@@ -32,7 +32,10 @@ mongoose.connect(config.database);
 var apiRoutes = express.Router();
 
 apiRoutes.get('/', function(req, res) {
-    res.status(200).send('API response OK!');
+  var currentTimeInMs = Date.now();
+  var today = moment().subtract(1, 'days').format('YYYY');
+
+  res.status(200).json({today});
 });
 
 apiRoutes.get('/latest', function(req, res) {
@@ -58,7 +61,6 @@ apiRoutes.get('/latest', function(req, res) {
                 return;
             });
         } else {
-            // console.log('rate found');
             res.status(200).json(rate);
             return;
         }
@@ -66,11 +68,6 @@ apiRoutes.get('/latest', function(req, res) {
 });
 
 apiRoutes.get('/history', function(req, res) {
-  // http://openexchangerates.org/api/historical/2016-02-16.json?app_id=5b8f552747da4235907d8e5ec87b1655
-  // 1455839462 18 feb 23:51:02 GMT
-  // 1455753062 17 feb 23:51:02 GMT
-  // 1455666664 16 feb 23:51:04 GMT
-  // 1455580262 15 feb 23:51:02 GMT
   var queryDate = req.query.date;
 
   if(!queryDate) {
@@ -78,9 +75,29 @@ apiRoutes.get('/history', function(req, res) {
   }
 
   // getting the last timestamp from queryDate
-  var historyDate = moment.utc(queryDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
+  var queryTimestamp = moment.utc(queryDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
 
-  return res.status(200).json({historyDate});
+  Rate.findOne({'rateTimestamp': queryTimestamp}).limit(1).select().exec(function(err, rate) {
+      if(err) {
+          res.status(501).send(err);
+          return;
+      } else if (!rate) {
+          // console.log('rate not found');
+          saveRate(queryDate, function(err, rateJson) {
+              if(err) {
+                  res.status(501).send(err);
+                  return;
+              }
+
+              res.status(200).json(rateJson);
+              return;
+          });
+      } else {
+          // console.log('rate found');
+          res.status(200).json(rate);
+          return;
+      }
+  });
 });
 
 app.use('/api', apiRoutes);
@@ -109,6 +126,32 @@ app.get('/setup', function(req, res) {
     res.status(200).json({success: true});
 });
 
+function getRate(rateDate, callback) {
+
+  if(!rateDate) {
+    return callback("Rate date parameter required!", null);
+  }
+
+  var queryTimestamp = moment.utc(rateDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
+
+  Rate.findOne({'rateTimestamp': queryTimestamp}).limit(1).select().exec(function(err, rate) {
+      if(err) {
+          return callback(err, null);
+      } else if (!rate) {
+          // console.log('rate not found');
+          saveRate(queryDate, function(err, rateJson) {
+              if(err) {
+                  return callback(err, null);
+              }
+
+              return callback(null, rateJson);
+          });
+      } else {
+          return callback(null, rate);
+      }
+  });
+}
+
 function saveLatestRate(callback) {
     var url = 'https://openexchangerates.org/api/latest.json?base=mmk&app_id=' + config.apiKey;
     request(url, function (err, response, data) {
@@ -122,6 +165,46 @@ function saveLatestRate(callback) {
                 }
             }
             rate.rateTimestamp = rateJson.timestamp;
+            rate.baseCurrency = rateJson.base;
+
+            rate.save(function(err) {
+                if(err) {
+                    return callback(err, null);
+                }
+
+                Rate.findById(rate._id, function (err, rate) {
+                    if(err) {
+                        return callback(err, null);
+                    }
+
+                    return callback(null, rate);
+                } );
+            });
+        }
+
+        if(err) {
+            return callback(err, null);
+        }
+    });
+}
+
+function saveRate(queryDate, callback) {
+    var url = 'https://openexchangerates.org/api/historical/' + queryDate + '.json?base=mmk&app_id=' + config.apiKey;
+    request(url, function (err, response, data) {
+        if (!err && response.statusCode == 200) {
+            var rateJson = JSON.parse(data);
+            var rate = new Rate();
+
+            for (var property in rateJson.rates) {
+                if (typeof rate.get(property) != 'undefined') {
+                    rate.set(property, rateJson.rates[property]);
+                }
+            }
+
+            // getting the last timestamp from queryDate
+            var timestamp = moment.utc(queryDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
+
+            rate.rateTimestamp = timestamp;
             rate.baseCurrency = rateJson.base;
 
             rate.save(function(err) {
