@@ -4,6 +4,8 @@ var bodyParser = require('body-parser');
 var morgan = require('morgan');
 var mongoose = require('mongoose');
 var request = require('request');
+var jwt = require('jsonwebtoken');
+var moment = require('moment');
 
 var config = require('./config');
 var Rate  =require('./models/rate');
@@ -12,6 +14,8 @@ var data = require('./data/latest');
 
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(bodyParser.json());
+
+app.set('superSecret', config.secret);
 
 // for development
 // app.use(morgan('dev'));
@@ -61,6 +65,24 @@ apiRoutes.get('/latest', function(req, res) {
     });
 });
 
+apiRoutes.get('/history', function(req, res) {
+  // http://openexchangerates.org/api/historical/2016-02-16.json?app_id=5b8f552747da4235907d8e5ec87b1655
+  // 1455839462 18 feb 23:51:02 GMT
+  // 1455753062 17 feb 23:51:02 GMT
+  // 1455666664 16 feb 23:51:04 GMT
+  // 1455580262 15 feb 23:51:02 GMT
+  var queryDate = req.query.date;
+
+  if(!queryDate) {
+    return res.status(401).send('History not found!');
+  }
+
+  // getting the last timestamp from queryDate
+  var historyDate = moment.utc(queryDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
+
+  return res.status(200).json({historyDate});
+});
+
 app.use('/api', apiRoutes);
 
 app.get('/', function(req, res) {
@@ -96,7 +118,7 @@ function saveLatestRate(callback) {
 
             for (var property in rateJson.rates) {
                 if (typeof rate.get(property) != 'undefined') {
-                    rate.set(property, 1 / rateJson.rates[property]);
+                    rate.set(property, rateJson.rates[property]);
                 }
             }
             rate.rateTimestamp = rateJson.timestamp;
