@@ -198,7 +198,8 @@ function saveRate(queryDate, callback) {
 
             for (var property in rateJson.rates) {
                 if (typeof rate.get(property) != 'undefined') {
-                    rate.set(property, rateJson.rates[property]);
+                  // TODO: temporary change inverse rate for myanmar currency
+                    rate.set(property, 1 / rateJson.rates[property]);
                 }
             }
 
