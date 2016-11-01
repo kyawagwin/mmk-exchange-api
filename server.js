@@ -8,7 +8,8 @@ var jwt = require('jsonwebtoken');
 var moment = require('moment');
 
 var config = require('./config');
-var Rate  =require('./models/rate');
+var Rate  = require('./models/rate');
+var BankRate = require('./models/BankRate');
 
 var data = require('./data/latest');
 
@@ -36,6 +37,53 @@ apiRoutes.get('/', function(req, res) {
   var today = moment().subtract(1, 'days').format('YYYY');
 
   res.status(200).json({today});
+});
+
+apiRoutes.get('/localbanks', function(req, res) {
+  var sourceBankId = [2, 13, 14, 18, 24];
+  var destBankId = ["AGD", "AYA", "CB", "MAB"];
+
+  var sourceCurId = [5, 6, 7];
+  var destCurId = ["USD", "EUR", "SGD"];
+
+  var strTodayDate = moment().format('YYYYMMDD');
+  var queryTimestamp = moment.utc(strTodayDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
+
+  var options = {
+    url: 'http://myforex.riberasolutions.com/api/v1/fetch_all_banks_forex',
+    headers: {
+      apikey: 'gkTvKaevqF8Gybi16Azq'
+    }
+  };
+
+  request(options, function(err, response, data) {
+    if(err) return res.status(501).send(err);
+
+    return res.status(200).json({data});
+  });
+  /*
+  BankRate.findOne({'rateTimestamp': queryTimestamp}).limit(1).select().exec(function(err, rate) {
+      if(err) {
+          res.status(501).send(err);
+          return;
+      } else if (!rate) {
+          // console.log('rate not found');
+          saveBankRate(function(err, rateJson) {
+              if(err) {
+                  res.status(501).send(err);
+                  return;
+              }
+
+              res.status(200).json(rateJson);
+              return;
+          });
+      } else {
+          // console.log('rate found');
+          res.status(200).json(rate);
+          return;
+      }
+  });
+  */
 });
 
 apiRoutes.get('/latest', function(req, res) {
@@ -150,6 +198,55 @@ function getRate(rateDate, callback) {
           return callback(null, rate);
       }
   });
+}
+
+function saveBankRate(callback) {
+
+    var options = {
+      url: 'https://myforex.riberasolutions.com/api/v1/fetch_all_banks_forex',
+      headers: {
+        'User-Agent': 'request',
+        'apikey': 'gkTvKaevqF8Gybi16Azq'
+      }
+    };
+
+    request(options, function (err, response, data) {
+      if (!err && response.statusCode == 200) {
+          var rateJson = JSON.parse(data);
+
+          return callback(null, rateJson);
+          /*
+          var rate = new Rate();
+
+          for (var property in rateJson.rates) {
+              if (typeof rate.get(property) != 'undefined') {
+                  // TODO: temporary change inverse rate for myanmar currency
+                  rate.set(property, 1 / rateJson.rates[property]);
+              }
+          }
+          rate.rateTimestamp = rateJson.timestamp;
+          rate.baseCurrency = rateJson.base;
+
+          rate.save(function(err) {
+              if(err) {
+                  return callback(err, null);
+              }
+
+              Rate.findById(rate._id, function (err, rate) {
+                  if(err) {
+                      return callback(err, null);
+                  }
+
+                  return callback(null, rate);
+              } );
+          });
+          */
+      }
+
+      if(err) {
+          return callback(err, null);
+      }
+    });
 }
 
 function saveLatestRate(callback) {
