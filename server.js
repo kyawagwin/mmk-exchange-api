@@ -6,6 +6,7 @@ var mongoose = require('mongoose');
 var request = require('request');
 var jwt = require('jsonwebtoken');
 var moment = require('moment');
+var _ = require('lodash');
 
 var config = require('./config');
 var Rate  = require('./models/rate');
@@ -40,11 +41,6 @@ apiRoutes.get('/', function(req, res) {
 });
 
 apiRoutes.get('/localbanks', function(req, res) {
-  var sourceBankId = [2, 13, 14, 18, 24];
-  var destBankId = ["AGD", "AYA", "CB", "MAB"];
-
-  var sourceCurId = [5, 6, 7];
-  var destCurId = ["USD", "EUR", "SGD"];
 
   var strTodayDate = moment().format('YYYYMMDD');
   var queryTimestamp = moment.utc(strTodayDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
@@ -55,7 +51,7 @@ apiRoutes.get('/localbanks', function(req, res) {
           return;
       } else if (!rate) {
           // console.log('rate not found');
-          saveBankRate(function(err, rateJson) {
+          saveBankRate(queryTimestamp, function(err, rateJson) {
               if(err) {
                   res.status(501).send(err);
                   return;
@@ -186,7 +182,13 @@ function getRate(rateDate, callback) {
   });
 }
 
-function saveBankRate(callback) {
+function saveBankRate(rateTimestamp, callback) {
+
+  var sourceBankId = [2, 13, 14, 18, 24];
+  var destBankId = ["AGD", "AYA", "CB", "MAB"];
+
+  var sourceCurId = [5, 6, 7];
+  var destCurId = ["USD", "EUR", "SGD"];
 
   var options = {
     url: 'http://myforex.riberasolutions.com/api/v1/fetch_all_banks_forex',
@@ -197,27 +199,80 @@ function saveBankRate(callback) {
 
     request(options, function (err, response, data) {
       if (!err && response.statusCode == 200) {
-          var rateJson = JSON.parse(data);
+          var addFlag = false;
+          var rateJsonArr = JSON.parse(data);
+          var bankRate = new BankRate();
+          var banks = [], bankRates = [];
 
-          // return callback(null, rateJson);
+          bankRate.rateTimestamp = rateTimestamp;
 
-          var BankRate = new BankRate();
+          for (var r = 0; r < rateJsonArr.length; r++) {
+            var bank = {}, rate = {};
 
-          for (var rate in rateJson) {
-              if (typeof rate.get(property) != 'undefined') {
-                  // TODO: temporary change inverse rate for myanmar currency
-                  rate.set(property, 1 / rateJson.rates[property]);
+            for (var i = 0; i < sourceBankId.length; i++) {
+              if(rateJsonArr[r].bank_id == sourceBankId[i]) {
+                bank.bankId = rateJsonArr[r].bank_id;
+                bank.bankName = destBankId[i];
+
+                if(banks.length == 0) {
+                  banks.push(bank);
+                } else {
+                  for(var b = 0; b < banks.length; b++) {
+                    addFlag = true;
+                    if(bank.bankId == banks[b].bankId) {
+                      addFlag = false;
+                      break;
+                    }
+
+                    // TODO: looping issue needed to resolve
+                    if(addFlag) {
+                      banks.push(bank);
+                    }
+                  }
+                }
               }
-          }
-          rate.rateTimestamp = rateJson.timestamp;
-          rate.baseCurrency = rateJson.base;
+            }
 
-          rate.save(function(err) {
+            for (var i = 0; i < sourceCurId.length; i++) {
+              if(rateJsonArr[r].currency_id == sourceCurId[i]) {
+                rate.bankId = rateJsonArr[r].bank_id;
+                rate.currencyId = rateJsonArr[r].currency_id;
+                rate.currency = destCurId[i];
+                rate.buyingRate = rateJsonArr[r].buying_rate;
+                rate.sellingRate = rateJsonArr[r].selling_rate;
+                rate.standardRate = rateJsonArr[r].standard_rate;
+                bankRates.push(bankRate);
+              }
+            }
+          }
+
+          var bankArr = [];
+          for(var b = 0; b < banks.length; b++) {
+            var bank = {};
+            bank.rates = [];
+            bank.bankName = banks[b].bankName;
+
+            for (var i = 0; i < bankRates.length; i++) {
+              if(banks[b].bankId === bankRates[i].bankId) {
+                var bankRate;
+                bankRate.currency = bankRates[i].currency;
+                bankRate.buyingRate = bankRates[i].buyingRate;
+                bankRate.sellingRate = bankRates[i].sellingRate;
+                bankRate.standardRate = bankRates[i].standardRate;
+              }
+              bank.rates.push(bankRate);
+            }
+            bankArr.push(bank);
+          }
+
+          bankRate.set("banks", bankArr);
+
+          bankRate.save(function(err) {
               if(err) {
                   return callback(err, null);
               }
 
-              Rate.findById(rate._id, function (err, rate) {
+              bankRate.findById(bankRate._id, function (err, rate) {
                   if(err) {
                       return callback(err, null);
                   }
