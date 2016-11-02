@@ -49,19 +49,6 @@ apiRoutes.get('/localbanks', function(req, res) {
   var strTodayDate = moment().format('YYYYMMDD');
   var queryTimestamp = moment.utc(strTodayDate, 'YYYYMMDD').add(1, 'days').subtract(1, 'ms').unix();
 
-  var options = {
-    url: 'http://myforex.riberasolutions.com/api/v1/fetch_all_banks_forex',
-    headers: {
-      apikey: 'gkTvKaevqF8Gybi16Azq'
-    }
-  };
-
-  request(options, function(err, response, data) {
-    if(err) return res.status(501).send(err);
-
-    return res.status(200).json({data});
-  });
-  /*
   BankRate.findOne({'rateTimestamp': queryTimestamp}).limit(1).select().exec(function(err, rate) {
       if(err) {
           res.status(501).send(err);
@@ -83,7 +70,6 @@ apiRoutes.get('/localbanks', function(req, res) {
           return;
       }
   });
-  */
 });
 
 apiRoutes.get('/latest', function(req, res) {
@@ -202,23 +188,22 @@ function getRate(rateDate, callback) {
 
 function saveBankRate(callback) {
 
-    var options = {
-      url: 'https://myforex.riberasolutions.com/api/v1/fetch_all_banks_forex',
-      headers: {
-        'User-Agent': 'request',
-        'apikey': 'gkTvKaevqF8Gybi16Azq'
-      }
-    };
+  var options = {
+    url: 'http://myforex.riberasolutions.com/api/v1/fetch_all_banks_forex',
+    headers: {
+      apikey: 'gkTvKaevqF8Gybi16Azq'
+    }
+  };
 
     request(options, function (err, response, data) {
       if (!err && response.statusCode == 200) {
           var rateJson = JSON.parse(data);
 
-          return callback(null, rateJson);
-          /*
-          var rate = new Rate();
+          // return callback(null, rateJson);
 
-          for (var property in rateJson.rates) {
+          var BankRate = new BankRate();
+
+          for (var rate in rateJson) {
               if (typeof rate.get(property) != 'undefined') {
                   // TODO: temporary change inverse rate for myanmar currency
                   rate.set(property, 1 / rateJson.rates[property]);
@@ -240,7 +225,6 @@ function saveBankRate(callback) {
                   return callback(null, rate);
               } );
           });
-          */
       }
 
       if(err) {
