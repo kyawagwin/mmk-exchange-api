@@ -226,7 +226,7 @@ function saveBankRate(rateTimestamp, callback) {
             }
 
             for (var c = 0; c < sourceCurId.length; c++) {
-              if(bankRate.currencyId == sourceBankId[c]) {
+              if(bankRate.currencyId == sourceCurId[c]) {
                 bankRate.currency = destCurId[c];
               }
             }
